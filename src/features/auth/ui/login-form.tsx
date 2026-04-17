@@ -19,7 +19,7 @@ export function LoginForm() {
 
   const handleQuickFill = (userId: string) => {
     setEmployeeId(userId);
-    setPassword("password123");
+    setPassword("Password123!");
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

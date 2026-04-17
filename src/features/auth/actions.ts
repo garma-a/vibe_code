@@ -13,8 +13,8 @@ export async function loginWithEmployeeId(formData: FormData) {
 
   const supabase = await createClient();
 
-  // Create a pseudo-email from the employee ID for Supabase auth
-  const email = `${employeeId.toLowerCase().trim()}@example.com`;
+  // Map employee ID to the pseudo-email format used in Supabase auth
+  const email = `${employeeId.toLowerCase().trim()}@aastmt.com`;
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
