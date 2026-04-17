@@ -14,9 +14,9 @@ export const BookingRequestSchema = z.object({
   managerName: z.string().optional(),
   managerJobTitle: z.string().optional(),
   managerMobile: z.string().optional(),
-  micsCount: z.coerce.number().min(0).optional(),
-  hasLaptop: z.boolean().optional(),
-  hasVideoConf: z.boolean().optional(),
+  micsCount: z.number().min(0).optional().default(0),
+  hasLaptop: z.boolean().optional().default(false),
+  hasVideoConf: z.boolean().optional().default(false),
   
 }).superRefine((data, ctx) => {
   const requestedDate = new Date(`${data.date}T00:00:00`); 
@@ -34,7 +34,6 @@ export const BookingRequestSchema = z.object({
 
   // Multi-Purpose constraints
   if (data.roomType === "multi-purpose") {
-    // Basic fields requirement
     if (!data.managerName || data.managerName.trim().length === 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["managerName"], message: "Manager name is required." });
     }
@@ -47,4 +46,15 @@ export const BookingRequestSchema = z.object({
   }
 });
 
-export type BookingRequestFormValues = z.infer<typeof BookingRequestSchema>;
+export type BookingRequestFormValues = {
+  roomType: "lecture" | "multi-purpose";
+  date: string;
+  timeSlotId: string;
+  reason: string;
+  managerName?: string;
+  managerJobTitle?: string;
+  managerMobile?: string;
+  micsCount?: number;
+  hasLaptop?: boolean;
+  hasVideoConf?: boolean;
+};

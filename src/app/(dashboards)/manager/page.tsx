@@ -1,6 +1,11 @@
 import { ManagerDashboardPage } from "@/features/manager-dashboard/ui/manager-dashboard-page";
-import { getManagerStats, getPendingManagerApprovals, getAllMultiPurposeBookings } from "@/features/manager-dashboard/queries";
-import { approveByManager, rejectByManager } from "@/features/manager-dashboard/actions";
+import {
+  getManagerPendingApprovals,
+  getManagerSystemBookings,
+  getManagerRooms,
+  getManagerTimeSlots,
+} from "@/features/manager-dashboard/queries";
+import { approveByManager } from "@/features/manager-dashboard/actions";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -10,19 +15,24 @@ export default async function ManagerPage() {
 
   if (!user) redirect("/login");
 
-  // Guard: only branch_manager role can access this page
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, role")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "branch_manager") redirect("/login");
+  if (!profile) redirect("/login");
 
-  const [stats, pendingApprovals, allBookings] = await Promise.all([
-    getManagerStats(),
-    getPendingManagerApprovals(),
-    getAllMultiPurposeBookings(),
+  if (profile.role !== "branch_manager") {
+    if (profile.role === "admin") redirect("/admin");
+    if (profile.role === "secretary") redirect("/secretary");
+    redirect("/employee");
+  }
+
+  const [pendingApprovals, rooms, timeSlots] = await Promise.all([
+    getManagerPendingApprovals(),
+    getManagerRooms(),
+    getManagerTimeSlots(),
   ]);
 
   const approveAction = async (id: string) => {
@@ -30,19 +40,19 @@ export default async function ManagerPage() {
     return await approveByManager(id);
   };
 
-  const rejectAction = async (id: string, feedback: string) => {
+  const fetchSystemBookingsAction = async (startDate: string, endDate: string) => {
     "use server";
-    return await rejectByManager(id, feedback);
+    return await getManagerSystemBookings(startDate, endDate);
   };
 
   return (
     <ManagerDashboardPage
       managerName={profile?.full_name || "Branch Manager"}
-      stats={stats}
       pendingApprovals={pendingApprovals}
-      allBookings={allBookings}
+      rooms={rooms}
+      timeSlots={timeSlots}
+      fetchSystemBookingsAction={fetchSystemBookingsAction}
       approveAction={approveAction}
-      rejectAction={rejectAction}
     />
   );
 }
