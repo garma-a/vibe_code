@@ -2,12 +2,12 @@ import { z } from "zod";
 
 export const BookingRequestSchema = z.object({
   roomType: z.enum(["lecture", "multi-purpose"], {
-    required_error: "Please select a room type.",
+    message: "Please select a room type.",
   }),
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Valid date is required.",
   }),
-  timeSlot: z.string().min(1, "Please select a time slot."),
+  timeSlotId: z.string().min(1, "Please select a time slot."),
   reason: z.string().min(5, "Please provide a reason or topic for the request."),
   
   // Multi-Purpose Fields (Optional initially, enforced strictly in superRefine)
