@@ -34,7 +34,11 @@ export function LoginForm() {
     }
 
     const formData = new FormData(e.currentTarget);
-    await loginWithEmployeeId(formData);
+    const result = await loginWithEmployeeId(formData);
+    
+    if (result?.error) {
+      setError(result.error);
+    }
     
     // In case the action returns early without redirecting (due to error)
     setIsLoading(false);
