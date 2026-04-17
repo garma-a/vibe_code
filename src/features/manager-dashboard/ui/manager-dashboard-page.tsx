@@ -9,11 +9,12 @@ import type {
   ManagerRoom,
   ManagerSystemBooking,
   ManagerTimeSlot,
+  ManagerVisibleRequest,
 } from "@/features/manager-dashboard/queries";
 import { ApprovalQueue } from "./approval-queue";
 import { ReadOnlyCalendar } from "./read-only-calendar";
 
-type ActiveTab = "queue" | "calendar";
+type ActiveTab = "queue" | "requests" | "calendar";
 type ToastType = "success" | "error" | "info";
 
 type ApproveResult =
@@ -23,6 +24,7 @@ type ApproveResult =
 interface ManagerDashboardPageProps {
   managerName: string;
   pendingApprovals: ManagerPendingApproval[];
+  allRequests: ManagerVisibleRequest[];
   rooms: ManagerRoom[];
   timeSlots: ManagerTimeSlot[];
   fetchSystemBookingsAction: (
@@ -30,18 +32,23 @@ interface ManagerDashboardPageProps {
     endDate: string,
   ) => Promise<ManagerSystemBooking[]>;
   approveAction: (id: string) => Promise<ApproveResult>;
+  rejectAction: (id: string) => Promise<ApproveResult>;
 }
 
 export function ManagerDashboardPage({
   managerName,
   pendingApprovals,
+  allRequests,
   rooms,
   timeSlots,
   fetchSystemBookingsAction,
   approveAction,
+  rejectAction,
 }: ManagerDashboardPageProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("queue");
   const [queueItems, setQueueItems] = useState<ManagerPendingApproval[]>(pendingApprovals);
+  const [visibleRequests, setVisibleRequests] = useState<ManagerVisibleRequest[]>(allRequests);
+  const [requestFilter, setRequestFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const showToast = (message: string, type: ToastType) => {
@@ -54,12 +61,18 @@ export function ManagerDashboardPage({
     }, 3500);
   };
 
+  const filteredRequests = useMemo(() => {
+    if (requestFilter === "all") return visibleRequests;
+    return visibleRequests.filter((request) => request.status === requestFilter);
+  }, [visibleRequests, requestFilter]);
+
   const stats = useMemo(() => {
     const pending = queueItems.length;
     const totalRooms = rooms.length;
     const totalSlots = timeSlots.length;
-    return { pending, totalRooms, totalSlots };
-  }, [queueItems.length, rooms.length, timeSlots.length]);
+    const totalRequests = visibleRequests.length;
+    return { pending, totalRooms, totalSlots, totalRequests };
+  }, [queueItems.length, rooms.length, timeSlots.length, visibleRequests.length]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -128,6 +141,12 @@ export function ManagerDashboardPage({
             icon={CalendarDays}
             tone="emerald"
           />
+          <StatCard
+            label="Total Requests Visible"
+            value={String(stats.totalRequests)}
+            icon={CheckCircle2}
+            tone="blue"
+          />
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -137,6 +156,12 @@ export function ManagerDashboardPage({
               active={activeTab === "queue"}
               onClick={() => setActiveTab("queue")}
               badge={queueItems.length}
+            />
+            <TabButton
+              label="All Requests (Read Only)"
+              active={activeTab === "requests"}
+              onClick={() => setActiveTab("requests")}
+              badge={visibleRequests.length}
             />
             <TabButton
               label="System Calendar (Read Only)"
@@ -150,11 +175,116 @@ export function ManagerDashboardPage({
           <ApprovalQueue
             items={queueItems}
             approveAction={approveAction}
+            rejectAction={rejectAction}
             onApproved={(id) => {
               setQueueItems((current) => current.filter((item) => item.id !== id));
+              setVisibleRequests((current) =>
+                current.map((request) =>
+                  request.id === id
+                    ? {
+                        ...request,
+                        branch_manager_status: "approved",
+                      }
+                    : request,
+                ),
+              );
+            }}
+            onRejected={(id) => {
+              setQueueItems((current) => current.filter((item) => item.id !== id));
+              setVisibleRequests((current) =>
+                current.map((request) =>
+                  request.id === id
+                    ? {
+                        ...request,
+                        status: "rejected",
+                        branch_manager_status: "rejected",
+                      }
+                    : request,
+                ),
+              );
             }}
             onToast={showToast}
           />
+        ) : activeTab === "requests" ? (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="text-base font-semibold text-[#0C2340]">All Requests (Read Only)</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Full visibility over all requests in the system. Actions are restricted to the Pending Queue.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(["all", "pending", "approved", "rejected"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setRequestFilter(filter)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                      requestFilter === filter
+                        ? "bg-[#0C2340] text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+              {filteredRequests.length === 0 ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-500">No requests found.</div>
+              ) : (
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Requester</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3">Room</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Slot</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Branch Stage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRequests.map((request) => (
+                      <tr key={request.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-800">{request.profiles?.full_name ?? "Unknown"}</p>
+                          <p className="text-xs text-slate-500">{request.profiles?.employee_id ?? "N/A"}</p>
+                        </td>
+                        <td className="px-4 py-3 capitalize text-slate-700">
+                          {(request.profiles?.role ?? "unknown").replace("_", " ")}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{request.rooms?.name ?? "Unknown Room"}</td>
+                        <td className="px-4 py-3 text-slate-700">{request.date}</td>
+                        <td className="px-4 py-3 text-slate-700">{request.time_slots?.slot_name ?? "N/A"}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              request.status === "approved"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : request.status === "rejected"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {request.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {request.branch_manager_status ?? "-"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
         ) : (
           <ReadOnlyCalendar
             rooms={rooms}
@@ -168,8 +298,8 @@ export function ManagerDashboardPage({
           <div className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
             <p>
-              Manager permissions on this screen are intentionally limited to final-approve workflow and
-              read-only visibility. No edit or rejection controls are exposed.
+              Branch Manager can see all system requests. Actions are restricted to approve/reject only for
+              Admin-created multi-purpose requests in Pending Queue.
             </p>
           </div>
         </section>

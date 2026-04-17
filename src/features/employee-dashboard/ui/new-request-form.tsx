@@ -10,38 +10,56 @@ import { Info, Calendar, Mic, Laptop, Video, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type TimeSlot = { id: string; slot_name: string };
+type RoomOption = { id: string; name: string; type: "lecture" | "multi-purpose" };
 
 export function NewRequestForm({ onSuccess, role = "employee" }: { onSuccess?: () => void; role?: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [rooms, setRooms] = useState<RoomOption[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
+  const [roomsLoading, setRoomsLoading] = useState(true);
 
-  // Fetch time slots from Supabase on mount
+  // Fetch time slots and rooms from Supabase on mount
   useEffect(() => {
-    const fetchSlots = async () => {
+    const fetchOptions = async () => {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("time_slots")
-        .select("id, slot_name")
-        .eq("is_active", true)
-        .order("start_time");
-      setTimeSlots(data || []);
-      setSlotsLoading(false);
+      try {
+        const [slotsResult, roomsResult] = await Promise.all([
+          supabase
+            .from("time_slots")
+            .select("id, slot_name")
+            .eq("is_active", true)
+            .order("start_time"),
+          supabase
+            .from("rooms")
+            .select("id, name, type")
+            .eq("is_active", true)
+            .order("name"),
+        ]);
+
+        setTimeSlots(slotsResult.data || []);
+        setRooms((roomsResult.data || []) as RoomOption[]);
+      } finally {
+        setSlotsLoading(false);
+        setRoomsLoading(false);
+      }
     };
-    fetchSlots();
+    fetchOptions();
   }, []);
 
   const {
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<BookingRequestFormValues>({
     resolver: zodResolver(BookingRequestSchema),
     defaultValues: {
       roomType: role === "secretary" ? "multi-purpose" : "lecture",
+      roomId: "",
       date: "",
       timeSlotId: "",
       reason: "",
@@ -54,7 +72,12 @@ export function NewRequestForm({ onSuccess, role = "employee" }: { onSuccess?: (
     },
   });
 
-  const selectedRoomType = useWatch({ control, name: "roomType" });
+  const selectedRoomType = useWatch({ control, name: "roomType" }) || (role === "secretary" ? "multi-purpose" : "lecture");
+  const availableRooms = rooms.filter((room) => room.type === selectedRoomType);
+
+  useEffect(() => {
+    setValue("roomId", "");
+  }, [selectedRoomType, setValue]);
 
   // Compute minimum date based on role
   const now = new Date();
@@ -69,6 +92,7 @@ export function NewRequestForm({ onSuccess, role = "employee" }: { onSuccess?: (
     try {
       const result = await submitBookingRequest({
         roomType: data.roomType,
+        roomId: data.roomId,
         date: data.date,
         timeSlotId: data.timeSlotId,
         reason: data.reason,
@@ -132,6 +156,30 @@ export function NewRequestForm({ onSuccess, role = "employee" }: { onSuccess?: (
               </label>
             </div>
             {errors.roomType && <p className="text-red-500 text-xs mt-2">{errors.roomType.message}</p>}
+          </div>
+
+          {/* Room Name */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Room Name</label>
+            <select
+              className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-sm focus:border-[#0C2340] focus:ring-1 focus:ring-[#0C2340] outline-none transition-shadow disabled:opacity-70"
+              disabled={roomsLoading || availableRooms.length === 0}
+              {...register("roomId")}
+            >
+              <option value="">
+                {roomsLoading
+                  ? "Loading rooms..."
+                  : availableRooms.length === 0
+                  ? "No rooms available for selected type"
+                  : "Select a room..."}
+              </option>
+              {availableRooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+            {errors.roomId && <p className="text-red-500 text-xs mt-2">{errors.roomId.message}</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

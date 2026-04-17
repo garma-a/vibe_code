@@ -4,8 +4,9 @@ import {
   getManagerSystemBookings,
   getManagerRooms,
   getManagerTimeSlots,
+  getManagerVisibleRequests,
 } from "@/features/manager-dashboard/queries";
-import { approveByManager } from "@/features/manager-dashboard/actions";
+import { approveByManager, rejectByManager } from "@/features/manager-dashboard/actions";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -29,8 +30,9 @@ export default async function ManagerPage() {
     redirect("/employee");
   }
 
-  const [pendingApprovals, rooms, timeSlots] = await Promise.all([
+  const [pendingApprovals, allRequests, rooms, timeSlots] = await Promise.all([
     getManagerPendingApprovals(),
+    getManagerVisibleRequests(),
     getManagerRooms(),
     getManagerTimeSlots(),
   ]);
@@ -38,6 +40,11 @@ export default async function ManagerPage() {
   const approveAction = async (id: string) => {
     "use server";
     return await approveByManager(id);
+  };
+
+  const rejectAction = async (id: string) => {
+    "use server";
+    return await rejectByManager(id);
   };
 
   const fetchSystemBookingsAction = async (startDate: string, endDate: string) => {
@@ -49,10 +56,12 @@ export default async function ManagerPage() {
     <ManagerDashboardPage
       managerName={profile?.full_name || "Branch Manager"}
       pendingApprovals={pendingApprovals}
+      allRequests={allRequests}
       rooms={rooms}
       timeSlots={timeSlots}
       fetchSystemBookingsAction={fetchSystemBookingsAction}
       approveAction={approveAction}
+      rejectAction={rejectAction}
     />
   );
 }

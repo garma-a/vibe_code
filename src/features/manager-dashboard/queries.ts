@@ -15,10 +15,12 @@ type PendingRaw = Omit<ManagerPendingApproval, "profiles" | "rooms" | "time_slot
     | {
         full_name: string;
         employee_id: string;
+        role: string;
       }
     | {
         full_name: string;
         employee_id: string;
+        role: string;
       }[]
     | null;
   rooms:
@@ -86,15 +88,63 @@ type SystemRaw = Omit<ManagerSystemBooking, "profiles" | "rooms" | "time_slots">
     | null;
 };
 
-export type ManagerPendingApproval = {
+type VisibleRaw = Omit<ManagerVisibleRequest, "profiles" | "rooms" | "time_slots"> & {
+  profiles:
+    | {
+        full_name: string;
+        employee_id: string;
+        role: string;
+      }
+    | {
+        full_name: string;
+        employee_id: string;
+        role: string;
+      }[]
+    | null;
+  rooms:
+    | {
+        id: string;
+        name: string;
+        type: "lecture" | "multi-purpose";
+      }
+    | {
+        id: string;
+        name: string;
+        type: "lecture" | "multi-purpose";
+      }[]
+    | null;
+  time_slots:
+    | {
+        id: string;
+        slot_name: string;
+        start_time: string;
+        end_time: string;
+      }
+    | {
+        id: string;
+        slot_name: string;
+        start_time: string;
+        end_time: string;
+      }[]
+    | null;
+};
+
+export type ManagerRequestBase = {
   id: string;
   date: string;
   reason: string;
-  status: string;
+  status: "pending" | "approved" | "rejected";
   room_type: "lecture" | "multi-purpose";
   room_id: string | null;
   time_slot_id: string | null;
   branch_manager_status: "pending" | "approved" | "rejected" | null;
+  created_at: string;
+  profiles: { full_name: string; employee_id: string; role: string } | null;
+  rooms: { id: string; name: string; type: "lecture" | "multi-purpose" } | null;
+  time_slots: { id: string; slot_name: string; start_time: string; end_time: string } | null;
+};
+
+export type ManagerPendingApproval = ManagerRequestBase & {
   admin_feedback: string | null;
   manager_name: string | null;
   manager_job_title: string | null;
@@ -102,11 +152,9 @@ export type ManagerPendingApproval = {
   mics_count: number | null;
   has_laptop: boolean | null;
   has_video_conf: boolean | null;
-  created_at: string;
-  profiles: { full_name: string; employee_id: string } | null;
-  rooms: { id: string; name: string; type: "lecture" | "multi-purpose" } | null;
-  time_slots: { id: string; slot_name: string; start_time: string; end_time: string } | null;
 };
+
+export type ManagerVisibleRequest = ManagerRequestBase;
 
 export type ManagerSystemBooking = {
   id: string;
@@ -144,7 +192,7 @@ export async function getManagerPendingApprovals(): Promise<ManagerPendingApprov
     .select(`
       id, date, reason, status, room_type, room_id, time_slot_id, branch_manager_status, admin_feedback,
       manager_name, manager_job_title, manager_mobile, mics_count, has_laptop, has_video_conf, created_at,
-      profiles ( full_name, employee_id ),
+      profiles ( full_name, employee_id, role ),
       rooms ( id, name, type ),
       time_slots ( id, slot_name, start_time, end_time )
     `)
@@ -161,12 +209,14 @@ export async function getManagerPendingApprovals(): Promise<ManagerPendingApprov
 
   const rows = (data ?? []) as PendingRaw[];
 
-  return rows.map((row) => ({
+  return rows
+    .map((row) => ({
     ...row,
     profiles: oneToOne(row.profiles),
     rooms: oneToOne(row.rooms),
     time_slots: oneToOne(row.time_slots),
-  })) as ManagerPendingApproval[];
+  }))
+    .filter((row) => row.profiles?.role === "admin") as ManagerPendingApproval[];
 }
 
 export async function getManagerSystemBookings(startDate: string, endDate: string): Promise<ManagerSystemBooking[]> {
@@ -199,6 +249,34 @@ export async function getManagerSystemBookings(startDate: string, endDate: strin
     rooms: oneToOne(row.rooms),
     time_slots: oneToOne(row.time_slots),
   })) as ManagerSystemBooking[];
+}
+
+export async function getManagerVisibleRequests(): Promise<ManagerVisibleRequest[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      id, date, reason, status, room_type, room_id, time_slot_id, branch_manager_status, created_at,
+      profiles ( full_name, employee_id, role ),
+      rooms ( id, name, type ),
+      time_slots ( id, slot_name, start_time, end_time )
+    `)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching manager visible requests:", error);
+    return [];
+  }
+
+  const rows = (data ?? []) as VisibleRaw[];
+
+  return rows.map((row) => ({
+    ...row,
+    profiles: oneToOne(row.profiles),
+    rooms: oneToOne(row.rooms),
+    time_slots: oneToOne(row.time_slots),
+  })) as ManagerVisibleRequest[];
 }
 
 export async function getManagerTimeSlots(): Promise<ManagerTimeSlot[]> {

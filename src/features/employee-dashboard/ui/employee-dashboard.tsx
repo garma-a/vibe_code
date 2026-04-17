@@ -9,16 +9,13 @@ import { BookingHistory } from "./booking-history";
 import { NewRequestForm } from "./new-request-form";
 import { getEmployeeStats, getEmployeeHistory, BookingRow } from "@/features/bookings/queries";
 
-export function EmployeeDashboard() {
+export function EmployeeDashboard({ role = "employee" }: { role?: "employee" | "secretary" }) {
   const [activeTab, setActiveTab] = useState<"overview" | "new-request">("overview");
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [history, setHistory] = useState<BookingRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [role, setRole] = useState<string>("employee");
-
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const [newStats, newHistory] = await Promise.all([
         getEmployeeStats(),
@@ -26,9 +23,7 @@ export function EmployeeDashboard() {
       ]);
       setStats(newStats);
       setHistory(newHistory);
-      
-      // Real app: fetch from getEmployeeStats / user profile
-      // We will assume "employee" for now as standard standard user, or we can add it to the queries.
+
     } catch (e) {
       console.error("Failed to fetch dashboard data:", e);
     } finally {
@@ -37,7 +32,13 @@ export function EmployeeDashboard() {
   };
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   return (
@@ -66,22 +67,20 @@ export function EmployeeDashboard() {
         <div className="flex gap-2 mb-8 bg-white p-1 rounded-xl shadow-sm border border-slate-100 w-fit">
           <button
             onClick={() => setActiveTab("overview")}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${
-              activeTab === "overview"
-                ? "bg-slate-100 text-[#0C2340]"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${activeTab === "overview"
+              ? "bg-slate-100 text-[#0C2340]"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              }`}
           >
             <LayoutDashboard className="w-4 h-4" />
             Overview
           </button>
           <button
             onClick={() => setActiveTab("new-request")}
-            className={`px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${
-              activeTab === "new-request"
-                ? "bg-[#0C2340] text-white shadow-md shadow-[#0C2340]/20"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${activeTab === "new-request"
+              ? "bg-[#0C2340] text-white shadow-md shadow-[#0C2340]/20"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              }`}
           >
             <PlusCircle className="w-4 h-4" />
             New Request
@@ -104,12 +103,13 @@ export function EmployeeDashboard() {
 
           {activeTab === "new-request" && (
             <div className="max-w-2xl">
-              <NewRequestForm 
+              <NewRequestForm
                 role={role}
                 onSuccess={() => {
-                  loadData(); // refresh
+                  setIsLoading(true);
+                  void loadData(); // refresh
                   setActiveTab("overview"); // jump back to overview to see it pending
-                }} 
+                }}
               />
             </div>
           )}

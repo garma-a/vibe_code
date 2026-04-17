@@ -11,6 +11,7 @@ import {
   Phone,
   User,
   Video,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,14 +32,18 @@ type ApproveResult =
 interface ApprovalQueueProps {
   items: ManagerPendingApproval[];
   approveAction: (id: string) => Promise<ApproveResult>;
+  rejectAction: (id: string) => Promise<ApproveResult>;
   onApproved: (id: string) => void;
+  onRejected: (id: string) => void;
   onToast: (message: string, type: QueueToastType) => void;
 }
 
 export function ApprovalQueue({
   items,
   approveAction,
+  rejectAction,
   onApproved,
+  onRejected,
   onToast,
 }: ApprovalQueueProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,6 +75,29 @@ export function ApprovalQueue({
     }
 
     onToast("Final approval submitted successfully.", "success");
+  };
+
+  const handleFinalReject = async () => {
+    if (!selectedBooking) return;
+
+    setIsProcessing(true);
+    const result = await rejectAction(selectedBooking.id);
+    setIsProcessing(false);
+
+    if (!result.success) {
+      onToast(result.error, "error");
+      return;
+    }
+
+    onRejected(selectedBooking.id);
+    setSelectedId(null);
+
+    if (result.warning) {
+      onToast(result.warning, "info");
+      return;
+    }
+
+    onToast("Request rejected successfully.", "success");
   };
 
   return (
@@ -181,6 +209,16 @@ export function ApprovalQueue({
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setSelectedId(null)}>
               Close
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50"
+              onClick={handleFinalReject}
+              disabled={isProcessing || !selectedBooking}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              {isProcessing ? "Rejecting..." : "Reject"}
             </Button>
             <Button
               type="button"

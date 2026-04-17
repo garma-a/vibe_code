@@ -4,6 +4,7 @@ export const BookingRequestSchema = z.object({
   roomType: z.enum(["lecture", "multi-purpose"], {
     message: "Please select a room type.",
   }),
+  roomId: z.string().min(1, "Please select a room."),
   date: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Valid date is required.",
   }),
@@ -48,6 +49,7 @@ export const BookingRequestSchema = z.object({
 
 export type BookingRequestFormValues = {
   roomType: "lecture" | "multi-purpose";
+  roomId: string;
   date: string;
   timeSlotId: string;
   reason: string;
