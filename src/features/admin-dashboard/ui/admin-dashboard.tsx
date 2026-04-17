@@ -15,6 +15,9 @@ type Booking = {
   date: string;
   reason: string;
   status: string;
+  admin_feedback?: string;
+  branch_manager_status?: string;
+  branch_manager_feedback?: string;
   rooms: { name: string } | null;
   profiles: { full_name: string; employee_id: string } | null;
 };
@@ -29,9 +32,11 @@ interface Props {
   multiActiveCount: number;
   multiPurposeRooms: Room[];
   timeSlots: Slot[];
+  recentDecisions?: Booking[];
+  multiPurposeStatusRequests?: Booking[];
 }
 
-export function AdminDashboard({ initialRequests, pendingCount, approvedCount, multiActiveCount, multiPurposeRooms, timeSlots }: Props) {
+export function AdminDashboard({ initialRequests, pendingCount, approvedCount, multiActiveCount, multiPurposeRooms, timeSlots, recentDecisions = [], multiPurposeStatusRequests = [] }: Props) {
   const [requests, setRequests] = useState<Booking[]>(initialRequests);
   const [isPending, startTransition] = useTransition();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -104,7 +109,7 @@ export function AdminDashboard({ initialRequests, pendingCount, approvedCount, m
         <Card>
           <CardContent className="pt-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Approved Today</p>
+              <p className="text-sm font-medium text-slate-500">Total Approved</p>
               <p className="text-3xl font-bold text-slate-800">{approvedCount}</p>
             </div>
             <CheckCircle2 className="h-8 w-8 text-emerald-400" />
@@ -113,7 +118,7 @@ export function AdminDashboard({ initialRequests, pendingCount, approvedCount, m
         <Card>
           <CardContent className="pt-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Multi-Purpose Today</p>
+              <p className="text-sm font-medium text-slate-500">Approved Multi-Purpose</p>
               <p className="text-3xl font-bold text-slate-800">{multiActiveCount}</p>
             </div>
             <FileText className="h-8 w-8 text-purple-400" />
@@ -190,6 +195,81 @@ export function AdminDashboard({ initialRequests, pendingCount, approvedCount, m
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+        {/* Admin Recent Decisions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Admin Decisions</CardTitle>
+            <CardDescription>Your latest accepted or rejected requests.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentDecisions.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No recent decisions.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentDecisions.map(req => (
+                  <div key={req.id} className="border rounded-lg bg-slate-50 p-3 flex items-center justify-between gap-4 flex-wrap text-sm">
+                    <div>
+                      <p className="font-semibold text-slate-800">{req.rooms?.name ?? 'Unknown Room'} <span className="text-slate-400 font-normal">({req.date})</span></p>
+                      <p className="text-xs text-slate-500">
+                        Req by: {req.profiles?.full_name}
+                      </p>
+                      {req.status === 'rejected' && req.admin_feedback && (
+                        <p className="text-xs text-red-600 mt-1">Reason: {req.admin_feedback}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      {req.status === 'approved' && <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle2 className="w-3 h-3 mr-1"/> Approved</Badge>}
+                      {req.status === 'rejected' && <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200"><X className="w-3 h-3 mr-1"/> Rejected</Badge>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Branch Manager Status Tracker */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Branch Manager Tracking</CardTitle>
+            <CardDescription>Final status of Multi-Purpose room requests.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {multiPurposeStatusRequests.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No branch manager trackings.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {multiPurposeStatusRequests.map(req => (
+                  <div key={req.id} className="border rounded-lg bg-slate-50 p-3 flex items-center justify-between gap-4 flex-wrap text-sm">
+                    <div>
+                      <p className="font-semibold text-slate-800">{req.rooms?.name ?? 'Unknown Room'} <span className="text-slate-400 font-normal">({req.date})</span></p>
+                      <p className="text-xs text-slate-500">
+                        Req by: {req.profiles?.full_name}
+                      </p>
+                      {req.branch_manager_status === 'rejected' && req.branch_manager_feedback && (
+                        <p className="text-xs text-red-600 mt-1">Feedback: {req.branch_manager_feedback}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      {req.branch_manager_status === 'pending' && <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200"><Clock className="w-3 h-3 mr-1"/> Pending BM</Badge>}
+                      {req.branch_manager_status === 'approved' && <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle2 className="w-3 h-3 mr-1"/> Approved</Badge>}
+                      {req.branch_manager_status === 'rejected' && <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200"><X className="w-3 h-3 mr-1"/> Rejected</Badge>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── MULTI-PURPOSE BOOKING MODAL ─────────────────────────────── */}
       {showBookingModal && (
