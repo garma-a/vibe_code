@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 export async function submitBookingRequest(formData: {
   roomType: string;
   date: string;
-  timeSlot: string;
+  timeSlotId: string; // UUID of the selected time slot
   reason: string;
   managerName?: string;
   managerJobTitle?: string;
@@ -22,11 +22,13 @@ export async function submitBookingRequest(formData: {
     return { success: false, error: "Unauthorized. Please log in." };
   }
 
+  // Determine initial status — multi-purpose bookings go through branch manager
+  // Both start as 'pending' for Admin first
   const { error } = await supabase.from("bookings").insert({
     user_id: userData.user.id,
     room_type: formData.roomType,
     date: formData.date,
-    time_slot: formData.timeSlot,
+    time_slot_id: formData.timeSlotId,
     reason: formData.reason,
     manager_name: formData.managerName,
     manager_job_title: formData.managerJobTitle,
@@ -34,7 +36,9 @@ export async function submitBookingRequest(formData: {
     mics_count: formData.micsCount || 0,
     has_laptop: formData.hasLaptop || false,
     has_video_conf: formData.hasVideoConf || false,
-    status: "pending", // Initially pending for admin/manager approval
+    status: "pending",
+    // For multi-purpose, branch manager must also approve after admin
+    branch_manager_status: formData.roomType === "multi-purpose" ? "pending" : null,
   });
 
   if (error) {
