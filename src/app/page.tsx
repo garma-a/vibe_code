@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import Image from "next/image";
 
 export default function Home() {
@@ -62,4 +63,10 @@ export default function Home() {
       </main>
     </div>
   );
+=======
+import { LandingPage } from "@/features/auth/ui/landing-page";
+
+export default function Home() {
+  return <LandingPage />;
+>>>>>>> 84dfc3879632e3f698f97438ea293a13c5862be3
 }
