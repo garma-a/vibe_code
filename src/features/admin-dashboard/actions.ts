@@ -68,10 +68,26 @@ export async function deleteSlot(id: string) {
 // ─── BOOKINGS ────────────────────────────────────────────────
 export async function approveBooking(id: string) {
   const supabase = await createClient();
+  
+  // First, get the room type for this booking
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('room_type')
+    .eq('id', id)
+    .single();
+
+  const updateData: any = { status: 'approved', admin_feedback: null };
+  
+  // If it's multi-purpose, it needs branch manager approval after admin approval
+  if (booking?.room_type === 'multi-purpose') {
+    updateData.branch_manager_status = 'pending';
+  }
+
   const { error } = await supabase
     .from('bookings')
-    .update({ status: 'approved', admin_feedback: null })
+    .update(updateData)
     .eq('id', id);
+
   if (error) return { error: error.message };
   revalidatePath('/admin');
   return { success: true };

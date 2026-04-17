@@ -15,6 +15,8 @@ type Booking = {
   date: string;
   reason: string;
   status: string;
+  branch_manager_status?: string;
+  branch_manager_feedback?: string;
   rooms: { name: string } | null;
   profiles: { full_name: string; employee_id: string } | null;
 };
@@ -29,9 +31,10 @@ interface Props {
   multiActiveCount: number;
   multiPurposeRooms: Room[];
   timeSlots: Slot[];
+  multiPurposeStatusRequests?: Booking[];
 }
 
-export function AdminDashboard({ initialRequests, pendingCount, approvedCount, multiActiveCount, multiPurposeRooms, timeSlots }: Props) {
+export function AdminDashboard({ initialRequests, pendingCount, approvedCount, multiActiveCount, multiPurposeRooms, timeSlots, multiPurposeStatusRequests = [] }: Props) {
   const [requests, setRequests] = useState<Booking[]>(initialRequests);
   const [isPending, startTransition] = useTransition();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -184,6 +187,44 @@ export function AdminDashboard({ initialRequests, pendingCount, approvedCount, m
                       </div>
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Branch Manager Status List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Branch Manager Decisions</CardTitle>
+          <CardDescription>Track the final status of Multi-Purpose room requests after your initial approval.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {multiPurposeStatusRequests.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">No recent multi-purpose decisions to track.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {multiPurposeStatusRequests.map(req => (
+                <div key={req.id} className="border rounded-lg bg-slate-50 p-3 flex items-center justify-between gap-4 flex-wrap text-sm">
+                  <div>
+                    <p className="font-semibold text-slate-800">{req.rooms?.name ?? 'Unknown Room'} <span className="text-slate-400 font-normal">({req.date})</span></p>
+                    <p className="text-xs text-slate-500">
+                      Req by: {req.profiles?.full_name}
+                      {req.reason && <span className="italic ml-2">"{req.reason}"</span>}
+                    </p>
+                    {req.branch_manager_status === 'rejected' && req.branch_manager_feedback && (
+                      <p className="text-xs text-red-600 mt-1">Feedback: {req.branch_manager_feedback}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {req.branch_manager_status === 'pending' && <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200"><Clock className="w-3 h-3 mr-1"/> Pending</Badge>}
+                    {req.branch_manager_status === 'approved' && <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle2 className="w-3 h-3 mr-1"/> Approved</Badge>}
+                    {req.branch_manager_status === 'rejected' && <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200"><X className="w-3 h-3 mr-1"/> Rejected</Badge>}
+                  </div>
                 </div>
               ))}
             </div>
