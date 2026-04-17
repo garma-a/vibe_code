@@ -89,6 +89,97 @@ export async function rejectBooking(id: string, reason: string, alternative?: st
   return { success: true };
 }
 
+export async function updateBookingSchedule(
+  bookingId: string,
+  roomId: string,
+  timeSlotId: string
+) {
+  const supabase = await createClient();
+
+  if (!bookingId || !roomId || !timeSlotId) {
+    return { error: 'Booking, room, and time slot are required.' };
+  }
+
+  const { data: targetBooking, error: targetError } = await supabase
+    .from('bookings')
+    .select('id, status, room_type, date')
+    .eq('id', bookingId)
+    .single();
+
+  if (targetError || !targetBooking) {
+    return { error: 'Booking not found.' };
+  }
+
+  if (targetBooking.status !== 'pending') {
+    return { error: 'Only pending requests can be edited.' };
+  }
+
+  const { data: room, error: roomError } = await supabase
+    .from('rooms')
+    .select('id, name, type, is_active')
+    .eq('id', roomId)
+    .single();
+
+  if (roomError || !room || !room.is_active) {
+    return { error: 'Selected room is not available.' };
+  }
+
+  if (room.type !== targetBooking.room_type) {
+    return { error: 'Selected room type does not match the request type.' };
+  }
+
+  const { data: slot, error: slotError } = await supabase
+    .from('time_slots')
+    .select('id, slot_name, is_active')
+    .eq('id', timeSlotId)
+    .single();
+
+  if (slotError || !slot || !slot.is_active) {
+    return { error: 'Selected time slot is not available.' };
+  }
+
+  const { data: conflicts, error: conflictError } = await supabase
+    .from('bookings')
+    .select('id')
+    .eq('date', targetBooking.date)
+    .eq('room_id', roomId)
+    .eq('time_slot_id', timeSlotId)
+    .in('status', ['pending', 'approved'])
+    .neq('id', bookingId)
+    .limit(1);
+
+  if (conflictError) {
+    return { error: 'Could not verify room availability. Please try again.' };
+  }
+
+  if (conflicts && conflicts.length > 0) {
+    return { error: 'This room is already booked at that time. Choose another room or time.' };
+  }
+
+  const { error: updateError } = await supabase
+    .from('bookings')
+    .update({ room_id: roomId, time_slot_id: timeSlotId })
+    .eq('id', bookingId)
+    .eq('status', 'pending');
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/calendar');
+
+  return {
+    success: true,
+    booking: {
+      room_id: room.id,
+      room_name: room.name,
+      time_slot_id: slot.id,
+      time_slot_name: slot.slot_name,
+    },
+  };
+}
+
 // ─── USER MANAGEMENT ─────────────────────────────────────────
 export async function toggleViewAllOverride(userId: string, value: boolean) {
   const supabase = await createClient();

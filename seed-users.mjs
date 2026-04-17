@@ -18,10 +18,10 @@ const users = [
 
 async function seed() {
   for (const u of users) {
-    const email = `${u.employee_id.toLowerCase()}@aastmt.system.local`;
+    const email = `${u.employee_id.toLowerCase()}@aastmt.com`;
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
-      password: "password123",
+      password: "Password123!",
     });
     
     if (authError) {
@@ -31,7 +31,7 @@ async function seed() {
         console.log("User already exists, attempting to update profile anyway...");
         const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
           email,
-          password: "password123"
+          password: "Password123!"
         });
         if (loginData?.user) {
           await upsertProfile(loginData.user.id, u);

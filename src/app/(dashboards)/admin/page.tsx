@@ -3,20 +3,19 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminPage() {
   const supabase = await createClient();
-  const today = new Date().toISOString().split('T')[0];
 
   const [
     { data: rawPending },
     { count: approvedCount },
     { count: multiActiveCount },
-    { data: rooms },
+    { data: allRooms },
     { data: slots },
     { data: recentDecisions },
     { data: multiStatusReqs },
   ] = await Promise.all([
     supabase
       .from('bookings')
-      .select('id, room_type, date, reason, status, rooms(name), profiles(full_name, employee_id)')
+      .select('id, room_id, time_slot_id, room_type, date, reason, status, rooms(name), time_slots(slot_name), profiles(full_name, employee_id)')
       .eq('status', 'pending')
       .order('created_at', { ascending: true }),
     supabase
@@ -28,7 +27,7 @@ export default async function AdminPage() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'approved')
       .eq('room_type', 'multi-purpose'),
-    supabase.from('rooms').select('id, name, type').eq('is_active', true).eq('type', 'multi-purpose').order('name'),
+    supabase.from('rooms').select('id, name, type').eq('is_active', true).order('name'),
     supabase.from('time_slots').select('id, slot_name, start_time, end_time').eq('is_active', true).order('start_time'),
     supabase
       .from('bookings')
@@ -45,16 +44,44 @@ export default async function AdminPage() {
       .limit(10) // Show recent 10 statuses
   ]);
 
+  const pendingDates = Array.from(new Set((rawPending ?? []).map((booking: { date?: string | null }) => booking.date).filter(Boolean))) as string[];
+
+  let bookingOccupancies: {
+    id: string;
+    date: string;
+    room_id: string;
+    time_slot_id: string | null;
+    status: 'pending' | 'approved';
+  }[] = [];
+
+  if (pendingDates.length > 0) {
+    const { data: occupancyRows } = await supabase
+      .from('bookings')
+      .select('id, date, room_id, time_slot_id, status')
+      .in('status', ['pending', 'approved'])
+      .in('date', pendingDates)
+      .not('room_id', 'is', null);
+
+    bookingOccupancies = (occupancyRows ?? []) as {
+      id: string;
+      date: string;
+      room_id: string;
+      time_slot_id: string | null;
+      status: 'pending' | 'approved';
+    }[];
+  }
+
   return (
     <AdminDashboard
-      initialRequests={(rawPending ?? []) as any}
+      initialRequests={rawPending ?? []}
       pendingCount={rawPending?.length ?? 0}
       approvedCount={approvedCount ?? 0}
       multiActiveCount={multiActiveCount ?? 0}
-      multiPurposeRooms={(rooms ?? []) as any}
-      timeSlots={(slots ?? []) as any}
-      recentDecisions={(recentDecisions ?? []) as any}
-      multiPurposeStatusRequests={(multiStatusReqs ?? []) as any}
+      allRooms={allRooms ?? []}
+      timeSlots={slots ?? []}
+      bookingOccupancies={bookingOccupancies}
+      recentDecisions={recentDecisions ?? []}
+      multiPurposeStatusRequests={multiStatusReqs ?? []}
     />
   );
 }
