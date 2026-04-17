@@ -23,6 +23,12 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+DO $$ BEGIN
+    CREATE TYPE manager_approval_status AS ENUM ('pending', 'approved', 'rejected');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 -- 2. Profiles Table (Maps Auth to RBAC)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -77,6 +83,8 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     
     -- Status and Admin Response
     status booking_status NOT NULL DEFAULT 'pending',
+    branch_manager_status manager_approval_status,
+    branch_manager_feedback TEXT,
     admin_feedback TEXT,
     
     -- Multi-Purpose Specific Fields (Nullable for Lecture rooms)
@@ -89,6 +97,28 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+ALTER TABLE public.bookings
+    ADD COLUMN IF NOT EXISTS branch_manager_status manager_approval_status;
+
+ALTER TABLE public.bookings
+    ADD COLUMN IF NOT EXISTS branch_manager_feedback TEXT;
+
+-- Ensure consistent defaults for legacy environments
+UPDATE public.bookings
+SET branch_manager_status = 'pending'
+WHERE room_type = 'multi-purpose' AND status = 'approved' AND branch_manager_status IS NULL;
+
+-- 7. VIP Notifications Table
+CREATE TABLE IF NOT EXISTS public.vip_notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    booking_id UUID NOT NULL REFERENCES public.bookings(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 -- Update Trigger for updated_at
@@ -115,6 +145,7 @@ ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.delegations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vip_notifications ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Anyone authenticated can read basic profiles (useful for Dropdowns)
 CREATE POLICY "Profiles are viewable by authenticated users" 
@@ -146,6 +177,19 @@ CREATE POLICY "Admins and Branch Managers can update bookings"
 ON public.bookings FOR UPDATE
 USING (
     (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin', 'branch_manager')
+);
+
+CREATE POLICY "Admins and Branch Managers can view VIP notifications"
+ON public.vip_notifications FOR SELECT
+USING (
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin', 'branch_manager')
+);
+
+CREATE POLICY "Branch Managers can insert VIP notifications"
+ON public.vip_notifications FOR INSERT
+WITH CHECK (
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'branch_manager'
+    AND created_by = auth.uid()
 );
 
 -- ==========================================

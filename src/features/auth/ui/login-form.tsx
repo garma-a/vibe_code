@@ -149,7 +149,7 @@ export function LoginForm() {
               <Button 
                 variant="outline" 
                 type="button"
-                onClick={() => handleQuickFill('admin-root')}
+                onClick={() => handleQuickFill('ADM001')}
                 className="border-white/10 bg-white/5 text-blue-100 hover:bg-white/10 hover:text-white flex items-center justify-start gap-2 h-10"
               >
                 <UserCog className="w-4 h-4 shrink-0 text-[hsl(45,100%,50%)]" />
@@ -158,7 +158,7 @@ export function LoginForm() {
               <Button 
                 variant="outline" 
                 type="button"
-                onClick={() => handleQuickFill('manager-01')}
+                onClick={() => handleQuickFill('MGR001')}
                 className="border-white/10 bg-white/5 text-blue-100 hover:bg-white/10 hover:text-white flex items-center justify-start gap-2 h-10"
               >
                 <Building2 className="w-4 h-4 shrink-0 text-[hsl(45,100%,50%)]" />
@@ -167,7 +167,7 @@ export function LoginForm() {
               <Button 
                 variant="outline" 
                 type="button"
-                onClick={() => handleQuickFill('employee-55')}
+                onClick={() => handleQuickFill('EMP001')}
                 className="border-white/10 bg-white/5 text-blue-100 hover:bg-white/10 hover:text-white flex items-center justify-start gap-2 h-10"
               >
                 <User className="w-4 h-4 shrink-0 text-[hsl(45,100%,50%)]" />
@@ -176,7 +176,7 @@ export function LoginForm() {
               <Button 
                 variant="outline" 
                 type="button"
-                onClick={() => handleQuickFill('secretary-01')}
+                onClick={() => handleQuickFill('SEC001')}
                 className="border-white/10 bg-white/5 text-blue-100 hover:bg-white/10 hover:text-white flex items-center justify-start gap-2 h-10"
               >
                 <Briefcase className="w-4 h-4 shrink-0 text-[hsl(45,100%,50%)]" />
